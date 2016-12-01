@@ -40,7 +40,12 @@ with open(inputFile, 'r') as content:
         if blockCallout or blockImg or blockCode:
             blockContent.append(line)
         else:
-            outputFile.write(line)
+            heading = re.match(r'#+[a-zA-Z]', line)
+            if heading:
+                insertpos = heading.end() - 1
+                outputFile.write(line[:insertpos] + " " + line[insertpos:])
+            else:
+                outputFile.write(line)
 
         if blockCallout and line.startswith("[/block]"):
             blockCallout = False
