@@ -3,7 +3,6 @@
 # readme.io markdown to GitHub-flavoured markdown conversion script, v3
 # Author: Marko Marinkovic (marko.marinkovic@sbgenomics.com)
 # TO DO:
-# - Hash symbols in headers need to be spaced from the text that follows
 # - Code conversion needs to be adapted to match two tabs within a single code block
 
 # Imports
@@ -11,6 +10,7 @@ import sys
 import json
 import re
 import os.path
+import urllib
 
 # Define output file name based on input file name
 inputFile = sys.argv[1]
@@ -25,10 +25,13 @@ with open(inputFile, 'r') as content:
     blockCallout = False
     blockImg = False
     blockCode = False
+    blockTable = False
     blockContent = []
     convertedCallouts = 0
     convertedImages = 0
     convertedCode = 0
+    convertedTables = 0
+    downloadedImages = 0
     for line in content:
 
         if line.startswith("[block:callout]"):
@@ -37,7 +40,9 @@ with open(inputFile, 'r') as content:
             blockImg = True
         elif line.startswith("[block:code]"):
             blockCode = True
-        if blockCallout or blockImg or blockCode:
+        elif line.startswith("[block:parameters]"):
+            blockTable = True
+        if blockCallout or blockImg or blockCode or blockTable:
             blockContent.append(line)
         else:
             heading = re.match(r'#+[a-zA-Z]', line)
@@ -66,9 +71,15 @@ with open(inputFile, 'r') as content:
             jsonString = " ".join(blockContent[1:lastitem])
             if jsonString != "":
                 data = json.loads(jsonString)
+                imagefile = data['images'][0]['image'][0].replace("https", "http")
+                print "Downloading " + data['images'][0]['image'][1]
+                if not os.path.exists("images"):
+                    os.makedirs("images")
+                urllib.urlretrieve(imagefile, "images/" + data['images'][0]['image'][1])
                 outputFile.write("\n" + "![" + data['images'][0]['image'][1] + "](" + data['images'][0]['image'][0] + " \"\")" "\n")
                 blockContent = []
                 convertedImages += 1
+                downloadedImages += 1
 
         elif blockCode and line.startswith("[/block]"):
             blockCode = False
@@ -80,6 +91,30 @@ with open(inputFile, 'r') as content:
                 blockContent = []
                 convertedCode += 1
 
+        elif blockTable and line.startswith("[/block]"):
+            blockTable = False
+            lastitem = len(blockContent)-1
+            jsonString = " ".join(blockContent[1:lastitem])
+            if jsonString != "":
+                data = json.loads(jsonString)
+                cols = data['cols']
+                rows = data['rows']
+                outputFile.write("\n")
+                for i in range(0, cols):
+                    headercell = "h-" + str(i)
+                    outputFile.write("|" + data['data'][headercell])
+                    if i == cols -1:
+                        outputFile.write("|" + "\n")
+                outputFile.write("|------|------|------|" + "\n")
+                for x in range(0, rows):
+                    for y in range(0, cols):
+                        cell = str(x) + "-" + str(y)
+                        linecont = data['data'][cell].replace('\n', '<br />')
+                        outputFile.write("|" + linecont)
+                        if y == cols - 1:
+                            outputFile.write("|" + "\n")
+                blockContent = []
+                convertedTables += 1
 
 print "--------------"
 print "Conversion log"
@@ -87,4 +122,6 @@ print "--------------"
 print "Converted callouts: " + str(convertedCallouts)
 print "Converted images: " + str(convertedImages)
 print "Converted code blocks: " + str(convertedCode)
+print "Converted tables: " + str(convertedTables)
+print "Downloaded images: " + str(downloadedImages)
 print "Output file: " + fName
