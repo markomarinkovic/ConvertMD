@@ -26,6 +26,7 @@ with open(inputFile, 'r') as content:
     blockImg = False
     blockCode = False
     blockTable = False
+    blockFrontmatter = False
     blockContent = []
     convertedCallouts = 0
     convertedImages = 0
